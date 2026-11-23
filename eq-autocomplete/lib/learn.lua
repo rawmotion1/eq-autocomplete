@@ -23,12 +23,14 @@ local MAX_PER_CONTEXT = 60
 
 local function empty() return { version = 1, cmds = {}, args = {}, lines = {} } end
 
----@param opts {dir:string, me:string, now?:(fun():number), write?:(fun(path:string, data:table))}
+---@param opts {dir:string, me:string, now?:(fun():number), clock?:(fun():number), write?:(fun(path:string, data:table))}
 function M.new(opts)
     local self = setmetatable({}, M)
     self.dir = opts.dir
     self.me = opts.me
-    self.now = opts.now or os.time
+    self.now = opts.now or os.time  -- dates kept in the file
+    -- seconds for the save-when-idle timer
+    self.clock = opts.clock or (okMq and function() return mq.gettime() / 1000 end) or nil
     self.write = opts.write or (okMq and mq.pickle) or nil
     self.own = empty()
     self.others = empty()
@@ -38,8 +40,9 @@ function M.new(opts)
 end
 
 ---A table saved with mq.pickle (a Lua file returning it), or nil when missing or unreadable.
+---Loaded with an empty environment, so a data file can't reach anything else.
 function M.readFile(path)
-    local chunk = loadfile(path)
+    local chunk = loadfile(path, 't', {})
     if not chunk then return nil end
     local ok, data = pcall(chunk)
     if ok and type(data) == 'table' then return data end
@@ -106,13 +109,13 @@ end
 
 ---Saves when something changed more than `after` seconds ago.
 function M:saveIfIdle(after)
-    if self.dirty and self.now() - self.changedAt >= (after or 5) then return self:save() end
+    if self.dirty and self.clock() - self.changedAt >= (after or 5) then return self:save() end
     return true
 end
 
 local function touch(self)
     self.dirty = true
-    self.changedAt = self.now()
+    self.changedAt = self.clock()
 end
 
 local function bump(self, map, word)

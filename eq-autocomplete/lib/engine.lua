@@ -38,7 +38,7 @@ function M.new(opts)
     local self = setmetatable({}, M)
     self.learn = opts.learn
     self.sources = opts.sources
-    self.now = opts.now or os.time
+    self.now = opts.now or os.time  -- a date, compared with the "last used" dates in learned files
     local extras = opts.extras or {}
     self.extras = extras
 

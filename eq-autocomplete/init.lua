@@ -28,6 +28,9 @@ local function say(fmt, ...)
     print(string.format("\ag[eqac]\ax " .. fmt, ...))
 end
 
+-- learned usage is filed under the character's name: wait for one to be in the world
+while mq.TLO.MacroQuest.GameState() ~= 'INGAME' do mq.delay(1000) end
+
 -- data folder
 local dataDir = mq.configDir .. '/eq-autocomplete'
 do

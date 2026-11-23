@@ -165,7 +165,7 @@ end
 function M:submit(line)
     line = line:gsub('^%s+', ''):gsub('%s+$', '')
     if line == '' then return end
-    if line:sub(1, 1) ~= '/' then line = '/' .. line end
+    if line:sub(1, 1) ~= "/" then line = "/" .. line end
     self.engine:record(line)
     self.send(line)
 end
@@ -253,15 +253,18 @@ local function popup(self, minX, minY, maxX, maxY)
         self.popupHovered = false
         return
     end
-    local width = math.max(maxX - minX, 260)
+    local style = ImGui.GetStyle()
+    local fontSize = ImGui.GetFontSize()
+    local width = math.max(maxX - minX, fontSize * 18)
     local display = ImGui.GetIO().DisplaySize
     local lineH = ImGui.GetTextLineHeightWithSpacing()
     local rows = math.min(#items, self:rows())
-    local estH = (rows + (syntax and math.min(#syntax, 3) + 2 or 0)) * lineH + 16
-    local y = maxY + 2
-    if y + estH > display.y and minY - estH - 2 > 0 then y = minY - estH - 2 end
+    local estH = (rows + (syntax and math.min(#syntax, 3) + 2 or 0)) * lineH + style.WindowPadding.y * 2
+    local gap = style.ItemInnerSpacing.y
+    local y = maxY + gap
+    if y + estH > display.y and minY - estH - gap > 0 then y = minY - estH - gap end
     ImGui.SetNextWindowPos(minX, y)
-    ImGui.SetNextWindowSizeConstraints(width, 0, math.max(width, 640), display.y)
+    ImGui.SetNextWindowSizeConstraints(width, 0, math.max(width, fontSize * 45), display.y)
     ImGui.SetNextWindowBgAlpha(0.95)
     local flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoResize, ImGuiWindowFlags.NoMove,
         ImGuiWindowFlags.NoSavedSettings, ImGuiWindowFlags.NoFocusOnAppearing, ImGuiWindowFlags.NoNav,
@@ -278,10 +281,13 @@ end
 
 function popupBody(self, items, rows, syntax)
     do
+        local style = ImGui.GetStyle()
         local labelW = 0
         for i = self.top, math.min(#items, self.top + rows - 1) do
             labelW = math.max(labelW, (xy(ImGui.CalcTextSize(items[i].w))))
         end
+        -- descriptions start one column gap after the widest name
+        local descX = style.WindowPadding.x + labelW + style.ItemSpacing.x * 2
         for i = self.top, math.min(#items, self.top + rows - 1) do
             local item = items[i]
             local _, clicked = ImGui.Selectable(item.w .. '##eqac_item' .. i, i == self.sel)
@@ -294,7 +300,7 @@ function popupBody(self, items, rows, syntax)
             end
             local d = describe(item)
             if d ~= '' then
-                ImGui.SameLine(labelW + 24)
+                ImGui.SameLine(descX)
                 ImGui.TextDisabled(d)
             end
         end
@@ -304,7 +310,8 @@ function popupBody(self, items, rows, syntax)
         if syntax then
             if #items > 0 then ImGui.Separator() end
             local outer = self.result.outer and (self.result.outer .. ' > ') or ''
-            ImGui.TextDisabled(outer .. (self.result.cmdName or '') .. (self.result.cmd.d ~= '' and ('  ' .. self.result.cmd.d) or ''))
+            local d = self.result.cmd.d or ''
+            ImGui.TextDisabled(outer .. (self.result.cmdName or '') .. (d ~= '' and ('  ' .. d) or ''))
             for i = 1, math.min(#syntax, 3) do ImGui.TextDisabled('  ' .. syntax[i]) end
             if #syntax > 3 then ImGui.TextDisabled(string.format('  (+%d more)', #syntax - 3)) end
         end
@@ -324,9 +331,10 @@ end
 function M:draw()
     if not self.open then return end
     local style = ImGui.GetStyle()
+    local fontSize = ImGui.GetFontSize()
     local h = ImGui.GetFrameHeight() + style.WindowPadding.y * 2
-    ImGui.SetNextWindowSize(460, h, ImGuiCond.FirstUseEver)
-    ImGui.SetNextWindowSizeConstraints(160, h, 4000, h)
+    ImGui.SetNextWindowSize(fontSize * 33, h, ImGuiCond.FirstUseEver)
+    ImGui.SetNextWindowSizeConstraints(fontSize * 11, h, ImGui.GetIO().DisplaySize.x, h)
     local flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrollbar,
         ImGuiWindowFlags.NoScrollWithMouse, ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoDocking)
     if self.settings.locked then flags = bit32.bor(flags, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize) end
@@ -349,7 +357,7 @@ function M:drawBox()
     local minX, minY, maxX, maxY
     do
         grip(self)
-        ImGui.SameLine(0, 2)
+        ImGui.SameLine(0, ImGui.GetStyle().ItemInnerSpacing.x)
         ImGui.SetNextItemWidth(-1)
         if self.focusNext then
             ImGui.SetKeyboardFocusHere()

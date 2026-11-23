@@ -87,9 +87,12 @@ function M:macroRunning(pattern)
     return name ~= nil and name:lower():find(pattern, 1, true) ~= nil
 end
 
----MacroQuest.ini [Aliases]: {['/t'] = '/tell', ...}, read with the Ini TLO every 30 s.
+---MacroQuest.ini [Aliases]: {['/t'] = '/tell', ...}. Re-read by refresh() (main loop) every 30 s.
 function M:aliases()
-    if self.aliasMap and now() - self.aliasAt < 30 then return self.aliasMap end
+    return self.aliasMap or self:loadAliases()
+end
+
+function M:loadAliases()
     local map = {}
     local keys = tlo(function() return mq.TLO.Ini.File(mq.configDir .. '/MacroQuest.ini').Section('Aliases').Key end)
     if keys then
@@ -166,11 +169,6 @@ function collect.names(self)
     return items
 end
 
--- Spawn suggestions (/nav spawn, /target...) come from within this distance, so they stay what
--- a player could see and reach. Your own characters are offered wherever they are.
-local SPAWN_RADIUS = 100
-local SPAWN_TYPES = { { 'npc', 'NPC' }, { 'pc', 'PC' }, { 'mercenary', 'Mercenary' } }
-
 function collect.spawns(self)
     local items, add = list()
     -- your characters first (level with keywords), then whatever is nearest
@@ -183,8 +181,10 @@ function collect.spawns(self)
     for _, n in ipairs(names.list) do add(n.w, n.d, 8 + (n.b or 0)) end
     local myId = tonumber(tlo(function() return mq.TLO.Me.ID() end)) or 0
     local near = {}
-    for _, t in ipairs(SPAWN_TYPES) do
-        local search = t[1] .. ' radius ' .. SPAWN_RADIUS
+    -- spawns within 100 units only, so suggestions stay what a player could see and reach
+    -- (your own characters, above, are offered wherever they are)
+    for _, t in ipairs({ { 'npc', 'NPC' }, { 'pc', 'PC' }, { 'mercenary', 'Mercenary' } }) do
+        local search = t[1] .. ' radius 100'
         local count = tonumber(tlo(function() return mq.TLO.SpawnCount(search)() end)) or 0
         for i = 1, math.min(count, 40) do
             local s = tlo(function() return mq.TLO.NearestSpawn(i, search) end)
@@ -217,7 +217,8 @@ function collect.items()
         if str(tlo(function() return item.Clicky() end)) then add(str(tlo(function() return item.Name() end)), where) end
     end
     for slot = 0, 22 do check(tlo(function() return mq.TLO.Me.Inventory(slot) end), 'worn') end
-    for slot = 23, 34 do
+    local bags = tonumber(tlo(function() return mq.TLO.Me.NumBagSlots() end)) or 10
+    for slot = 23, 22 + bags do
         local pack = tlo(function() return mq.TLO.Me.Inventory(slot) end)
         if pack and tlo(function() return pack() end) then
             check(pack, 'in inventory')
@@ -345,6 +346,7 @@ end
 function M:refresh()
     local t = now()
     local changed = false
+    if t - self.aliasAt >= 30 then self:loadAliases() end
     for kind, at in pairs(self.wanted) do
         local c = self.cache[kind]
         if t - at < WANTED_FOR and (not c or t - c.t >= (TTL[kind] or 10)) and collect[kind] then
