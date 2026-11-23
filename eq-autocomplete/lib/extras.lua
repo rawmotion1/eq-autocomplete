@@ -14,9 +14,9 @@ M.commands = {
     -- this script's own command
     ['/eqac'] = {
         p = 'MacroQuest', d = 'eq-autocomplete: this box.',
-        s = { '/eqac [show | hide | focus | slash | key <combo>|off | reload | forget | stop]' },
+        s = { '/eqac [show | hide]', '/eqac key <combo> | off' },
         g = {
-            { { alt = { { 'show' }, { 'hide' }, { 'toggle' }, { 'focus' }, { 'slash' }, { 'reload' }, { 'forget' }, { 'stop' } }, o = 1 } },
+            { { alt = { { 'show' }, { 'hide' } }, o = 1 } },
             { 'key', { alt = { { 'shift+/' }, { 'off' }, { { v = 'keycombo' } } }, o = 1 } },
         },
     },

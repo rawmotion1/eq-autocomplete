@@ -1,15 +1,20 @@
 --[[
   What you type, remembered: how often each command word and each argument was used, and the
-  last lines you sent (for Up/Down recall). Pure Lua, no MacroQuest.
+  last lines you sent (for Up/Down recall). Saved with mq.pickle, read back with loadfile; the
+  logic itself needs no MacroQuest, so it is tested offline with a stand-in for mq.pickle.
 
   Each character writes its own file (learned_<server>_<name>.lua in the data folder), so two
   game windows never overwrite each other; every character reads all the files, so usage on one
   character ranks suggestions on all of them.
 
-  Data:  cmds[word]          = {n = uses, t = last use (os.time), w = word as typed}
+  Data:  cmds[word]          = {n = uses, t = last use, w = word as typed}
          args[context][word] = same; context = "<command>|<argument number>|<previous word>"
          lines               = last lines sent, oldest first (own file only)
+  "Last use" is os.time(), a date: it is saved and compared across game sessions, which
+  mq.gettime() (milliseconds since this game client started) can't do.
 ]]
+local okMq, mq = pcall(require, 'mq')
+
 local M = {}
 M.__index = M
 
@@ -18,12 +23,13 @@ local MAX_PER_CONTEXT = 60
 
 local function empty() return { version = 1, cmds = {}, args = {}, lines = {} } end
 
----@param opts {dir:string, me:string, now?:fun():number}
+---@param opts {dir:string, me:string, now?:(fun():number), write?:(fun(path:string, data:table))}
 function M.new(opts)
     local self = setmetatable({}, M)
     self.dir = opts.dir
     self.me = opts.me
     self.now = opts.now or os.time
+    self.write = opts.write or (okMq and mq.pickle) or nil
     self.own = empty()
     self.others = empty()
     self.dirty = false
@@ -31,76 +37,13 @@ function M.new(opts)
     return self
 end
 
--- -----------------------------------------------------------------------------------------
--- Serializing (a plain Lua table literal; read back without giving it access to anything)
-
-local RESERVED = {}
-for w in ('and break do else elseif end false for function goto if in local nil not or repeat return then true until while')
-    :gmatch('%a+') do RESERVED[w] = true end
-
-local function ser(v, indent, out)
-    local t = type(v)
-    if t == 'string' then
-        out[#out + 1] = string.format('%q', v)
-    elseif t == 'number' or t == 'boolean' then
-        out[#out + 1] = tostring(v)
-    elseif t == 'table' then
-        local keys = {}
-        for k in pairs(v) do keys[#keys + 1] = k end
-        table.sort(keys, function(a, b)
-            if type(a) == type(b) then return a < b end
-            return type(a) == 'number'
-        end)
-        local isArray = #keys == #v
-        out[#out + 1] = '{\n'
-        for _, k in ipairs(keys) do
-            out[#out + 1] = indent .. '  '
-            if not isArray then
-                if type(k) == 'string' and k:match('^[%a_][%w_]*$') and not RESERVED[k] then
-                    out[#out + 1] = k .. ' = '
-                else
-                    out[#out + 1] = '[' .. (type(k) == 'string' and string.format('%q', k) or tostring(k)) .. '] = '
-                end
-            end
-            ser(v[k], indent .. '  ', out)
-            out[#out + 1] = ',\n'
-        end
-        out[#out + 1] = indent .. '}'
-    else
-        out[#out + 1] = 'nil'
-    end
-end
-
-function M.serialize(tbl)
-    local out = { 'return ' }
-    ser(tbl, '', out)
-    out[#out + 1] = '\n'
-    return table.concat(out)
-end
-
+---A table saved with mq.pickle (a Lua file returning it), or nil when missing or unreadable.
 function M.readFile(path)
-    local f = io.open(path, 'r')
-    if not f then return nil end
-    local src = f:read('*a')
-    f:close()
-    local env = {}
-    local chunk = load(src, '@' .. path, 't', env)
+    local chunk = loadfile(path)
     if not chunk then return nil end
-    ---@diagnostic disable-next-line: deprecated
-    if setfenv then setfenv(chunk, env) end
     local ok, data = pcall(chunk)
     if ok and type(data) == 'table' then return data end
     return nil
-end
-
-local function writeFile(path, text)
-    local tmp = path .. '.tmp'
-    local f = io.open(tmp, 'w')
-    if not f then return false end
-    f:write(text)
-    f:close()
-    os.remove(path)
-    return os.rename(tmp, path)
 end
 
 local function sane(d)
@@ -155,8 +98,8 @@ function M.add(map, k, e)
 end
 
 function M:save()
-    if not self.dirty then return true end
-    local ok = writeFile(self:ownPath(), M.serialize(self.own))
+    if not self.dirty or not self.write then return true end
+    local ok = pcall(self.write, self:ownPath(), self.own)
     if ok then self.dirty = false end
     return ok
 end

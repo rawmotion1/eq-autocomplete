@@ -1,9 +1,0 @@
-# downloaded docs pages (tools\build_commands.py)
-tools/cache/
-tests/out/
-
-# personal: never in the repo (the script keeps these in <MacroQuest>\config\eq-autocomplete\)
-CLAUDE.local.md
-learned_*.lua
-settings.lua
-cwtn_cache.lua

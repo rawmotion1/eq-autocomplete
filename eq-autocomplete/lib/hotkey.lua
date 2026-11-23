@@ -1,0 +1,46 @@
+--[[
+  A key that opens the box, ready to type (e.g. shift+/).
+
+  Lua can't register key binds, so this uses MacroQuest's: a MQ2CustomBinds bind named "eqac"
+  whose command is
+      /docommand ${If[${Lua.Script[eq-autocomplete].Status.Equal[RUNNING]},/eqac show,/lua run eq-autocomplete show]}
+  (stored with /noparse, so the ${...} is worked out on each key press: when the script isn't
+  running the key starts it), and /bind eqac <key>.
+
+  Plain "/" can't be used: EverQuest's chat window opens on it anyway.
+
+  The binds are saved in MacroQuest.ini and MQ2CustomBinds.txt (all characters), but a game
+  window reads them only when it starts, so init.lua has every running copy apply the shared
+  setting to its own window.
+]]
+local M = {}
+
+M.BIND = "eqac"
+M.COMMAND = "/docommand ${If[${Lua.Script[eq-autocomplete].Status.Equal[RUNNING]},/eqac show,"
+    .. "/lua run eq-autocomplete show]}"
+
+---The commands that give `key` to the box, or (key nil) take it away. A `quiet` step is always
+---squelched: "/custombind add" answers "name in use" when the bind is already there, which is fine.
+---@param key string|nil e.g. "shift+/"
+---@return {cmd:string, quiet:boolean|nil}[]
+function M.steps(key)
+    if key then
+        return {
+            { cmd = "/custombind add " .. M.BIND, quiet = true },
+            { cmd = "/noparse /custombind set " .. M.BIND .. " " .. M.COMMAND },
+            { cmd = "/bind " .. M.BIND .. " " .. key },
+        }
+    end
+    return {
+        { cmd = "/bind " .. M.BIND .. " clear" },
+        { cmd = "/custombind delete " .. M.BIND },
+    }
+end
+
+---`cmd` with MacroQuest's replies squelched (/noparse stays first so the ${...} is kept as text).
+function M.squelched(cmd)
+    if cmd:find("^/noparse ") then return "/noparse /squelch " .. cmd:sub(10) end
+    return "/squelch " .. cmd
+end
+
+return M

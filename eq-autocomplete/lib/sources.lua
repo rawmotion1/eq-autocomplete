@@ -87,23 +87,18 @@ function M:macroRunning(pattern)
     return name ~= nil and name:lower():find(pattern, 1, true) ~= nil
 end
 
----MacroQuest.ini [Aliases]: {['/t'] = '/tell', ...}, re-read every 30 s.
+---MacroQuest.ini [Aliases]: {['/t'] = '/tell', ...}, read with the Ini TLO every 30 s.
 function M:aliases()
     if self.aliasMap and now() - self.aliasAt < 30 then return self.aliasMap end
     local map = {}
-    local f = io.open(mq.configDir .. '/MacroQuest.ini', 'r')
-    if f then
-        local inside = false
-        for line in f:lines() do
-            local section = line:match('^%s*%[(.-)%]')
-            if section then
-                inside = section:lower() == 'aliases'
-            elseif inside then
-                local k, v = line:match('^%s*(/[^=%s]+)%s*=%s*(.-)%s*$')
-                if k and v ~= '' then map[k:lower()] = v end
-            end
+    local keys = tlo(function() return mq.TLO.Ini.File(mq.configDir .. '/MacroQuest.ini').Section('Aliases').Key end)
+    if keys then
+        local count = tonumber(tlo(function() return keys.Count() end)) or 0
+        for i = 1, count do  -- KeyAtIndex counts from 1
+            local k = str(tlo(function() return keys.KeyAtIndex(i)() end))
+            local v = str(tlo(function() return keys.ValueAtIndex(i)() end))
+            if k and v and k:sub(1, 1) == '/' then map[k:lower()] = v end
         end
-        f:close()
     end
     self.aliasMap, self.aliasAt = map, now()
     return map
@@ -171,6 +166,11 @@ function collect.names(self)
     return items
 end
 
+-- Spawn suggestions (/nav spawn, /target...) come from within this distance, so they stay what
+-- a player could see and reach. Your own characters are offered wherever they are.
+local SPAWN_RADIUS = 100
+local SPAWN_TYPES = { { 'npc', 'NPC' }, { 'pc', 'PC' }, { 'mercenary', 'Mercenary' } }
+
 function collect.spawns(self)
     local items, add = list()
     -- your characters first (level with keywords), then whatever is nearest
@@ -181,20 +181,21 @@ function collect.spawns(self)
         self.cache.names = names
     end
     for _, n in ipairs(names.list) do add(n.w, n.d, 8 + (n.b or 0)) end
-    local ok, spawns = pcall(mq.getAllSpawns)
-    if not ok or type(spawns) ~= 'table' then return items end
+    local myId = tonumber(tlo(function() return mq.TLO.Me.ID() end)) or 0
     local near = {}
-    for _, s in ipairs(spawns) do
-        local typ = str(tlo(function() return s.Type() end))
-        if typ == 'NPC' or typ == 'PC' or typ == 'Mercenary' then
-            local name = str(tlo(function() return s.CleanName() end))
-            local dist = tonumber(tlo(function() return s.Distance() end))
-            if name and dist then near[#near + 1] = { name = name, dist = dist, typ = typ } end
+    for _, t in ipairs(SPAWN_TYPES) do
+        local search = t[1] .. ' radius ' .. SPAWN_RADIUS
+        local count = tonumber(tlo(function() return mq.TLO.SpawnCount(search)() end)) or 0
+        for i = 1, math.min(count, 40) do
+            local s = tlo(function() return mq.TLO.NearestSpawn(i, search) end)
+            local id = s and tonumber(tlo(function() return s.ID() end)) or 0
+            local name = s and str(tlo(function() return s.CleanName() end))
+            local dist = s and tonumber(tlo(function() return s.Distance() end))
+            if id ~= myId and name and dist then near[#near + 1] = { name = name, dist = dist, typ = t[2] } end
         end
     end
     table.sort(near, function(a, b) return a.dist < b.dist end)
-    for i = 1, math.min(#near, 80) do
-        local s = near[i]
+    for i, s in ipairs(near) do
         add(s.name, string.format('%s, %d away', s.typ, math.floor(s.dist + 0.5)), math.max(0, 6 - i / 10))
     end
     return items
@@ -354,12 +355,6 @@ function M:refresh()
     end
     if changed then self.version = self.version + 1 end
     return changed
-end
-
----Drops every cached list (after /eqac reload).
-function M:reset()
-    self.cache, self.pluginCache, self.aliasMap = {}, {}, nil
-    self.version = self.version + 1
 end
 
 return M

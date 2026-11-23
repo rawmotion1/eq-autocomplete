@@ -1,129 +1,93 @@
 # eq-autocomplete
 
-A floating command box for MacroQuest. Type a command and it suggests the rest as you go:
-commands, their keywords, and live values such as your other logged-in characters, nearby
-spawns, memorized spells, clickies, zones and Lua scripts. It learns what you type most and ranks
-that first. Enter sends the line to MacroQuest, as if typed in the MQ console.
+A floating command box for MacroQuest with autocomplete. Start typing a command and it suggests
+the rest: the command itself, the options its syntax allows next, and live values from the game
+such as your other characters, nearby spawns, zones, memorized spells, clickies and Lua scripts.
+Press Tab to take a suggestion and Enter to run the line. It learns which commands and arguments
+you use most and puts them first.
+
+## Installation
+
+Copy the `eq-autocomplete` folder into your MacroQuest `lua` folder, so that you have
+`lua\eq-autocomplete\init.lua`, then in game:
 
 ```
 /lua run eq-autocomplete
 ```
 
-Put this folder in MacroQuest's `lua` folder as `eq-autocomplete` (a copy, or a junction to a clone).
+**Requires** MacroQuest. **Optional:** MQ2DanNet or EQBC (your characters' names), Magellan (zone
+list), MQ2CustomBinds (ships with MacroQuest; used for the hotkey).
+
+## What it knows
+
+- **Every publicly listed EverQuest and MacroQuest command**, from the RedGuides command docs,
+  including the plugins documented there (MQ2Nav, MQ2DanNet, MQ2MoveUtils...), with their
+  documented abbreviations (`/nav`, `/dex`, `/dgge`...). Plugin commands only show up while the
+  plugin is loaded.
+- **Common commands for popular plugins.** I'm adding these over time. Already in: the CWTN class
+  plugins (`/shd`, `/shm`, `/brd`...), with the commands listed on each plugin's RedGuides page.
+  Your own class's command comes first.
+- **Your aliases** from MacroQuest.ini. An alias that wraps another command, like
+  `/cwtn = /dgge /docommand /$\{Me.Class.ShortName}`, completes like the command it runs.
+- **What comes next:** after `/nav` it offers `spawn`, `target`, `loc`...; after `/hidecorpse`
+  its options. The command's syntax is shown under the list.
+- **Live values**, picked by what the command expects at that point:
+  - your logged-in characters, group and raid members: `/tell`, `/dex`, `/invite`, `/assist`, `/bct`
+  - spawns within 100 units, after your own characters: `/nav spawn`, `/target`
+  - zone short names from Magellan's travel list (or every zone MacroQuest knows), matched on the
+    long name too: `/travelto knowl` offers `poknowledge`
+  - spells in your gems (`/cast`), clickies you carry (`/useitem`), combat abilities (`/disc`),
+    buffs (`/removebuff`), abilities (`/doability`)
+  - Lua scripts (`/lua run`), running scripts (`/lua stop`), macros (`/mac`), plugins (`/plugin`),
+    DanNet groups (`/dgt`, `/dgae`)
+- **Nested commands:** after `/dex Name`, `/dgge`, `/timed 10`, `/squelch`, `/noparse` and the
+  like, the rest of the line completes as a command of its own: `/dex Bob /nav spawn Alice`.
+- **What you type:** every argument is remembered in its place, so the names and commands you use
+  most rise to the top, and commands it doesn't know yet get suggestions too. Messages (the text
+  of a `/tell`) are not remembered word by word.
 
 ## Keys
 
 | Key | What it does |
 | --- | --- |
-| Tab | Complete the word with the highlighted suggestion (adds a space at the end of the line) |
-| Right arrow | The same, when the cursor is already at the end of the line |
+| Tab | Complete the word with the highlighted suggestion |
+| Right arrow | The same, when the cursor is at the end of the line |
 | Up / Down | Move through the suggestions. With none showing, step through lines you sent before |
-| Enter | Send the line. A line without a leading `/` gets one |
+| Enter | Run the line (a missing leading `/` is added) |
 | Escape | Clear the line; press again to leave the box |
 
-The highlighted suggestion shows as grey text after the cursor. Clicking a suggestion also
-completes it. Under the list is the command's syntax as documented, so you can see what comes next.
-
-The `::` grip on the left moves the box; drag its right edge to resize. Right-click the grip for
-options: keep focus after Enter, show syntax, lock position, number of rows, hide.
+The highlighted suggestion shows as grey text after the cursor, and clicking a suggestion also
+completes it. Drag the `::` grip to move the box and its right edge to resize it. Right-click the
+grip for options: keep focus after Enter, show syntax, lock position, number of rows, hide.
 
 ## Commands
 
 | Command | |
 | --- | --- |
 | `/eqac` | Show or hide the box |
-| `/eqac focus` | Show it and put the cursor in it |
-| `/eqac slash` | The same, on a fresh line starting with `/` |
-| `/eqac key shift+/` | Make a key (any combo) open the box with `/` typed. `/eqac key off` undoes it; `/eqac key` says what is set |
-| `/eqac reload` | Re-read aliases, scripts, plugins and the other characters' usage now |
-| `/eqac forget` | Forget what was learned on this character |
-| `/eqac stop` | Close it |
+| `/eqac show` | Show it, ready to type on a fresh line starting with `/` |
+| `/eqac hide` | Hide it |
+| `/eqac key shift+/` | Make a key open the box ready to type (any key combination). `/eqac key off` removes it; `/eqac key` says what is set |
 
-## Open it with a key
+`/lua stop eq-autocomplete` closes it.
 
-`/eqac key shift+/` makes shift+/ open the box on a fresh line starting with `/`. Any MacroQuest
-key combo works (`ctrl+/`, `shift+enter`...). `/eqac key off` removes it, and `/eqac key` says
-what is set. It prints each command it runs, with MacroQuest's replies, then reads the saved
-binds back and says whether they were saved.
+## Opening it with a key
 
-How it works: a custom bind (MQ2CustomBinds) named `eqac` is put on the key. Its command checks
-whether the script is running: if it is, it opens the box (`/eqac slash`); if it isn't, it starts
-it (`/lua run eq-autocomplete slash`). Plain `/` also belongs to MQ2ChatWnd's bind `MQ2CSCHAT`, so
-choosing `/` clears that bind (and `off` restores it); other keys leave it alone. In practice
-EverQuest still opens its chat on plain `/`, so use a combination such as shift+/.
+`/eqac key shift+/` makes shift+/ open the box with `/` already typed. Any MacroQuest key
+combination works (`ctrl+/`, `shift+enter`...). If the script isn't running, the key starts it.
+Plain `/` can't be used: EverQuest opens its chat window on it anyway.
 
-The binds are saved for all characters, but a game window reads them only when it starts. Every
-running copy of the script follows the setting within 10 seconds; game windows without the script
-pick it up when they restart. The key does nothing to a line you are already typing in the box.
+The key is saved for all your characters. Characters already running the script pick it up
+within 10 seconds; the others when their game restarts.
 
-## What it suggests
+## Your data
 
-- **Commands**: about 670 EverQuest, MacroQuest and plugin commands from the RedGuides docs, plus
-  their documented abbreviations (`/nav`, `/dex`, `/dgge`...) and your aliases from `MacroQuest.ini`.
-  Plugin commands only show when the plugin is loaded (KissAssist's only while it runs).
-- **Keywords**: what each command's syntax allows at that point, e.g. `/nav` then `spawn`, `target`, `loc`...
-- **Live values**, picked by what the syntax expects there:
-  - characters: your logged-in characters (DanNet peers, EQBC if connected), group and raid members.
-    `/tell`, `/dex`, `/invite`, `/assist`, `/bct`...
-  - spawns: your characters first, then the nearest NPCs and PCs. `/nav spawn`, `/target`
-  - zones: short names from the Magellan script's travel list when it is installed (else every
-    zone MacroQuest knows), matched on the long name too:
-    `/travelto knowl` offers `poknowledge`.
-  - spells in your gems (`/cast`), clickies you carry (`/useitem`), combat abilities (`/disc`),
-    buffs (`/removebuff`), abilities (`/doability`)
-  - Lua scripts (`/lua run`), running scripts (`/lua stop`), macros (`/mac`), plugins (`/plugin`),
-    DanNet groups (`/dgt`, `/dgae`)
-- **CWTN class plugins**: on a character running one (MQ2Shaman, MQ2Bard, MQ2EsKay...), its class
-  command (`/shm`, `/brd`, `/shd`...) with every action (`mode`, `pause`, `burnnow`, `toggleui`...)
-  and setting (`UseMelee`, `CampRadius`...), each showing its current value, and the mode names.
-  Read at start from the plugin and the character's `config\CWTN\<Plugin>_<Name>.ini`. An alias
-  that broadcasts the class command, like `/cwtn = /dgge /docommand /$\{Me.Class.ShortName}`,
-  completes the same way.
-- **Nested commands**: after `/dex Name`, `/dgge`, `/timed 10`, `/squelch`, `/noparse` and the like,
-  the rest of the line is completed as a command of its own: `/dex Bob /nav spawn Alice`.
-- **What you typed before**: every argument is remembered in its place (command, position, the word
-  before it), so commands the docs don't know about (`/rgl pause`) get suggestions too. Free text
-  such as a `/tell` message is not learned word by word.
+What it learns, your recent lines and its settings stay on your PC, in
+`<MacroQuest>\config\eq-autocomplete\`: one `learned_<server>_<name>.lua` file per character,
+read by all your characters, so what you type on one helps the others. Nothing is sent anywhere.
+Delete a character's file to start it over.
 
-## Learning, and where your data lives
+## Notes
 
-Each line you send counts toward its command and each argument. Suggestions you use often, and
-recently, move up. Each character writes its own file and reads everyone's, so what you type on
-one character ranks suggestions on all of them (re-read every minute). The last 300 lines are kept
-per character for Up/Down recall.
-
-All of it stays in MacroQuest's config folder, never in this folder:
-`<MacroQuest>\config\eq-autocomplete\`
-
-- `learned_<server>_<name>.lua`: one character's usage and recent lines
-- `settings.lua`: box options and the opening key (shared)
-- `cwtn_cache.lua`: what was read from CWTN plugin files (rebuilt when a plugin changes)
-
-## Changing what it knows
-
-- `lib\commands.lua` is generated from the RedGuides pages:
-  `python tools\build_commands.py` (uses the copies in `tools\cache\`, downloading any missing),
-  or `python tools\build_commands.py --refresh` to download them again.
-- `lib\extras.lua` is hand-written and survives a rebuild: commands the docs lack (`/lua`),
-  keywords people really type (`/nav spawn`, `/stick behind`), which placeholder gets which live
-  list, and the commands that rank higher before anything is learned.
-
-## Tests
-
-```
-powershell -NoProfile -ExecutionPolicy Bypass -File tests\run.ps1     # engine, grammar, learning, offline
-powershell -NoProfile -ExecutionPolicy Bypass -File tests\check.ps1   # type check against ..\mq-definitions
-```
-
-Both use the Lua language server from the VS Code Lua extension; no Lua install needed. The type
-check expects [mq-definitions](https://github.com/macroquest/mq-definitions) next to this folder.
-The offline tests run on a newer Lua than MacroQuest's LuaJIT and can't reach ImGui, so
-`lib\ui.lua` is covered only by the type check.
-
-## Status
-
-- Works in game: the box, sending lines, learning, the opening key (shift+/).
-- Checked in game with read-only probes: the live lists' TLO calls, the opening key's check
-  (running vs not), the CWTN reader (one SHD character: 141 actions and settings, 9 modes) and
-  the Magellan zone list (605 zones).
-- Not yet confirmed in game: CWTN and zone suggestions inside the box, the `/cwtn`-style alias.
+- Spawn names with spaces are inserted in quotes.
+- Bug reports, and commands it gets wrong or doesn't know, are welcome.

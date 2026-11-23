@@ -78,17 +78,6 @@ end
 -- -----------------------------------------------------------------------------------------
 -- Commands
 
----Adds (or replaces) a command found at run time, e.g. a CWTN class command (lib/cwtn.lua).
-function M:addCommand(name, entry)
-    name = name:lower()
-    if not self.db[name] then
-        self.names[#self.names + 1] = name
-        table.sort(self.names)
-    end
-    self.db[name] = entry
-    self.common[name] = true
-end
-
 -- "/${Me.Class.ShortName}" (CWTN aliases broadcast it so each character runs its own class
 -- command) stands for this character's class command.
 function M:classWord(word)
