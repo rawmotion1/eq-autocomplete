@@ -3,15 +3,12 @@
   last lines you sent (for Up/Down recall). Saved with mq.pickle, read back with loadfile; the
   logic itself needs no MacroQuest, so it is tested offline with a stand-in for mq.pickle.
 
-  Each character writes its own file (learned_<server>_<name>.lua in the data folder), so two
-  game windows never overwrite each other; every character reads all the files, so usage on one
-  character ranks suggestions on all of them. The other files are read once at the start; after
-  that one is read again only when its character says it has finished writing it (init.lua
-  passes that on), never on a timer, so a file is never read while it is half written.
+  Each character has its own file (learned_<server>_<name>.lua in the data folder) and reads only
+  that one: characters never learn from each other, and no file is shared between game windows.
 
   Data:  cmds[word]          = {n = uses, t = last use, w = word as typed}
          args[context][word] = same; context = "<command>|<argument number>|<previous word>"
-         lines               = last lines sent, oldest first (own file only)
+         lines               = last lines sent, oldest first
   "Last use" is os.time(), a date: it is saved and compared across game sessions, which
   mq.gettime() (milliseconds since this game client started) can't do.
 ]]
@@ -25,7 +22,7 @@ local MAX_PER_CONTEXT = 60
 
 local function empty() return { version = 1, cmds = {}, args = {}, lines = {} } end
 
----@param opts {dir:string, me:string, now?:(fun():number), clock?:(fun():number), write?:(fun(path:string, data:table)), saved?:(fun(name:string))}
+---@param opts {dir:string, me:string, now?:(fun():number), clock?:(fun():number), write?:(fun(path:string, data:table))}
 function M.new(opts)
     local self = setmetatable({}, M)
     self.dir = opts.dir
@@ -34,10 +31,7 @@ function M.new(opts)
     -- seconds for the save-when-idle timer
     self.clock = opts.clock or (okMq and function() return mq.gettime() / 1000 end) or nil
     self.write = opts.write or (okMq and mq.pickle) or nil
-    self.saved = opts.saved  -- called with the file's name after each successful save
     self.own = empty()
-    self.files = {}          -- other characters' files as last read: name -> data
-    self.others = empty()    -- the sum of self.files
     self.dirty = false
     self.changedAt = 0
     return self
@@ -61,71 +55,22 @@ local function sane(d)
     return d
 end
 
-function M:ownName()
-    return 'learned_' .. self.me .. '.lua'
-end
-
 function M:ownPath()
-    return self.dir .. '/' .. self:ownName()
+    return self.dir .. '/learned_' .. self.me .. '.lua'
 end
 
----Is `name` another character's learned file (a bare file name, nothing else)?
-function M:isOther(name)
-    return type(name) == 'string' and name:match('^learned_[%w_]+%.lua$') ~= nil
-        and name:lower() ~= self:ownName():lower()
-end
-
----Loads this character's file. listFiles(dir) -> names in the folder, used to read the others.
-function M:load(listFiles)
+---Loads this character's file.
+function M:load()
     self.own = sane(M.readFile(self:ownPath()))
-    self:loadOthers(listFiles)
-end
-
--- sums the other characters' files into self.others
-local function merge(self)
-    local others = empty()
-    for _, d in pairs(self.files) do
-        for k, e in pairs(d.cmds) do M.add(others.cmds, k, e) end
-        for ctx, words in pairs(d.args) do
-            if type(words) == 'table' then
-                others.args[ctx] = others.args[ctx] or {}
-                for k, e in pairs(words) do M.add(others.args[ctx], k, e) end
-            end
-        end
-    end
-    self.others = others
-end
-
----Reads all the other characters' files.
-function M:loadOthers(listFiles)
-    self.files = {}
-    for _, name in ipairs(listFiles and listFiles(self.dir) or {}) do
-        if self:isOther(name) then
-            local d = M.readFile(self.dir .. '/' .. name)
-            if d then self.files[name:lower()] = sane(d) end
-        end
-    end
-    merge(self)
-end
-
----Reads one other character's file again, after that character said it saved it. If it can't
----be read, what was read from it before is kept.
-function M:reloadOther(name)
-    if not self:isOther(name) then return false end
-    local d = M.readFile(self.dir .. '/' .. name)
-    if not d then return false end
-    self.files[name:lower()] = sane(d)
-    merge(self)
-    return true
 end
 
 ---Another character is now playing in this game window: saves what the last one learned, then
----reads the new one's file and the others again.
-function M:switchTo(me, listFiles)
+---loads the new one's file.
+function M:switchTo(me)
     self:save()
     self.me = me
     self.dirty = false
-    self:load(listFiles)
+    self:load()
 end
 
 -- adds entry e ({n, t, w}) into map[k]
@@ -143,10 +88,7 @@ end
 function M:save()
     if not self.dirty or not self.write then return true end
     local ok = pcall(self.write, self:ownPath(), self.own)
-    if ok then
-        self.dirty = false
-        if self.saved then self.saved(self:ownName()) end
-    end
+    if ok then self.dirty = false end
     return ok
 end
 
@@ -212,40 +154,26 @@ end
 
 function M:lines() return self.own.lines end
 
----Merged (own + other characters) entries for command words: map word -> {n, t, w}
+---Entries for command words: map word -> {n, t, w}
 function M:commands()
-    local out = {}
-    for k, e in pairs(self.others.cmds) do M.add(out, k, e) end
-    for k, e in pairs(self.own.cmds) do M.add(out, k, e) end
-    return out
+    return self.own.cmds
 end
 
----Merged entries for one argument context.
+---Entries for one argument context.
 function M:argsFor(cmd, argNo, prev)
-    local key = M.contextKey(cmd, argNo, prev)
-    local out = {}
-    for k, e in pairs(self.others.args[key] or {}) do M.add(out, k, e) end
-    for k, e in pairs(self.own.args[key] or {}) do M.add(out, k, e) end
-    return out
+    return self.own.args[M.contextKey(cmd, argNo, prev)] or {}
 end
 
----Merged entries for an argument position whatever came before it (a weaker hint).
+---Entries for an argument position whatever came before it (a weaker hint), summed over contexts.
 function M:argsAt(cmd, argNo)
     local prefix = (cmd or ''):lower() .. '|' .. tostring(argNo) .. '|'
     local out = {}
-    for _, src in ipairs({ self.others.args, self.own.args }) do
-        for key, words in pairs(src) do
-            if key:sub(1, #prefix) == prefix then
-                for k, e in pairs(words) do M.add(out, k, e) end
-            end
+    for key, words in pairs(self.own.args) do
+        if key:sub(1, #prefix) == prefix then
+            for k, e in pairs(words) do M.add(out, k, e) end
         end
     end
     return out
-end
-
-function M:clear()
-    self.own = empty()
-    touch(self)
 end
 
 return M

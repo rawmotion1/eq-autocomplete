@@ -9,9 +9,9 @@
 
   Plain "/" can't be used: EverQuest's chat window opens on it anyway.
 
-  The binds are saved in MacroQuest.ini and MQ2CustomBinds.txt (all characters), but a game
-  window reads them only when it starts, so init.lua has every running copy apply the shared
-  setting to its own window.
+  MacroQuest saves the binds in MacroQuest.ini and MQ2CustomBinds.txt, for every character, and
+  that is the only record of the key. A game window reads those files only when the game starts,
+  so when the script starts it applies the saved key to its own window (M.saved()).
 
   MQ2CustomBinds ships with MacroQuest and is loaded by default, but it can be unloaded. Before
   any of this it is checked, and if it isn't loaded it is loaded with "noauto": for this session
@@ -42,6 +42,16 @@ function M.steps(key)
         { cmd = "/bind " .. M.BIND .. " clear" },
         { cmd = "/custombind delete " .. M.BIND },
     }
+end
+
+---The key MacroQuest.ini holds for the bind ([Key Binds] eqac_Nrm), or nil when there is none.
+---@return string|nil
+function M.saved()
+    local ok, key = pcall(function()
+        return mq.TLO.Ini.File(mq.configDir .. '/MacroQuest.ini').Section('Key Binds').Key(M.BIND .. '_Nrm').Value()
+    end)
+    if ok and type(key) == 'string' and key ~= '' and key:lower() ~= 'clear' then return key end
+    return nil
 end
 
 local function pluginLoaded()

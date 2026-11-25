@@ -68,14 +68,13 @@ grip for options: keep focus after Enter, show syntax, lock position, number of 
 | `/eqac show` | Show it, ready to type on a fresh line starting with `/` |
 | `/eqac hide` | Hide it |
 | `/eqac key shift+/` | Make a key open the box ready to type (any key combination). `/eqac key off` removes it; `/eqac key` says what is set |
-| `/eqac stop` | Save what it learned and close it |
 
-`/lua stop eq-autocomplete` closes it too, but gives the script no chance to save first, so a line
-sent in the last 5 seconds may not be remembered. `/eqac stop` saves first.
+`/lua stop eq-autocomplete` closes it. What it learned is saved 5 seconds after the last line you
+sent, so a line sent just before stopping may not be remembered.
 
 You can camp and log in another character without restarting it: it saves when the character
 leaves the world, hides the box at character select, and switches to the new character's learned
-file when that one enters the world.
+usage and settings when that one enters the world.
 
 ## Opening it with a key
 
@@ -83,8 +82,8 @@ file when that one enters the world.
 combination works (`ctrl+/`, `shift+enter`...). If the script isn't running, the key starts it.
 Plain `/` can't be used: EverQuest opens its chat window on it anyway.
 
-The key is saved for all your characters. Characters already running the script pick it up at
-once; the others when they next start it.
+The key is a MacroQuest key bind, so MacroQuest saves it for all your characters. A game window
+that is already running gets it the next time the script starts there.
 
 The key uses MQ2CustomBinds. It ships with MacroQuest and is loaded by default; if you have
 unloaded it, the script loads it when it needs it with `noauto`, for that session only, so your
@@ -93,16 +92,11 @@ runs, but can only start the script if MQ2CustomBinds is loaded when the game st
 
 ## Your data
 
-What it learns, your recent lines and its settings stay on your PC, in
-`<MacroQuest>\config\eq-autocomplete\`: one `learned_<server>_<name>.lua` file per character,
-read by all your characters, so what you type on one helps the others. Nothing is sent anywhere.
-Delete a character's file to start it over.
-
-Each game window runs its own copy of the script, and only a character's own copy writes its
-file. A character saves 5 seconds after you last sent a line (and when it leaves the world or
-you `/eqac stop`), then tells the other copies through MacroQuest's actors (the message is only the
-file's name), and they read that one file again. The same goes for `settings.lua`; saving a setting changes only that setting in the
-file. Nothing is re-read on a timer.
+Each character keeps its own: what it learned and your recent lines in
+`learned_<server>_<name>.lua`, and the box's options in `settings_<server>_<name>.lua`, both in
+`<MacroQuest>\config\eq-autocomplete\` on your PC. Characters don't learn from each other, and you
+can, say, lock the box on one and not on another. Nothing is sent anywhere. Delete a character's
+files to start it over.
 
 ## Notes
 
