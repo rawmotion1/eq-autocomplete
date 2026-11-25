@@ -18,11 +18,12 @@ M.__index = M
 local WINDOW = 'eq-autocomplete##eqac'
 local POPUP = '##eqac_suggestions'
 
----@param opts {engine:table, learn:table, sources:table, settings:table, saveSettings:fun(), send:fun(line:string)}
+---@param opts {engine:table, learn:table, sources:table, settings:table, saveSetting:fun(key:string), send:fun(line:string)}
 function M.new(opts)
     local self = setmetatable({}, M)
     for k, v in pairs(opts) do self[k] = v end
     self.open = true
+    self.away = false  -- set by init.lua while no character is in the world: the box isn't drawn
     self.text = ''
     self.cursor = 0
     self.prevCursor = 0
@@ -195,20 +196,23 @@ local function grip(self)
     end
     if ImGui.BeginPopupContextItem('##eqac_menu') then
         local s = self.settings
-        local changed = false
+        local function set(key, value)
+            if s[key] == value then return end
+            s[key] = value
+            self.saveSetting(key)
+        end
         local _, v
-        _, v = ImGui.MenuItem('Keep focus after Enter', nil, s.keepFocus); if v ~= s.keepFocus then s.keepFocus = v; changed = true end
-        _, v = ImGui.MenuItem('Show command syntax', nil, s.showSyntax); if v ~= s.showSyntax then s.showSyntax = v; changed = true end
-        _, v = ImGui.MenuItem('Lock position and size', nil, s.locked); if v ~= s.locked then s.locked = v; changed = true end
+        _, v = ImGui.MenuItem('Keep focus after Enter', nil, s.keepFocus); set('keepFocus', v)
+        _, v = ImGui.MenuItem('Show command syntax', nil, s.showSyntax); set('showSyntax', v)
+        _, v = ImGui.MenuItem('Lock position and size', nil, s.locked); set('locked', v)
         if ImGui.BeginMenu('Rows in the list') then
             for _, n in ipairs({ 5, 8, 12, 16 }) do
-                if ImGui.MenuItem(tostring(n), nil, s.rows == n) then s.rows = n; changed = true end
+                if ImGui.MenuItem(tostring(n), nil, s.rows == n) then set('rows', n) end
             end
             ImGui.EndMenu()
         end
         ImGui.Separator()
         if ImGui.MenuItem('Hide (/eqac to show)') then self.open = false end
-        if changed then self.saveSettings() end
         ImGui.EndPopup()
     end
 end
@@ -329,7 +333,7 @@ function M:report(err)
 end
 
 function M:draw()
-    if not self.open then return end
+    if not self.open or self.away then return end
     local style = ImGui.GetStyle()
     local fontSize = ImGui.GetFontSize()
     local h = ImGui.GetFrameHeight() + style.WindowPadding.y * 2
@@ -387,6 +391,14 @@ function M:drawBox()
         ghost(self, minX, minY, maxX)
     end
     return minX, minY, maxX, maxY
+end
+
+---Empties the line and the Up/Down recall: another character is now playing in this window.
+function M:reset()
+    self.text, self.cursor, self.prevCursor = '', 0, 0
+    self.hist, self.histText = nil, nil
+    self.pendingEdit = nil
+    self.resultText = nil  -- suggestions are worked out again
 end
 
 ---Shows the box and puts the cursor in it. With `line`, starts a fresh line holding it

@@ -5,7 +5,9 @@
 
   Each character writes its own file (learned_<server>_<name>.lua in the data folder), so two
   game windows never overwrite each other; every character reads all the files, so usage on one
-  character ranks suggestions on all of them.
+  character ranks suggestions on all of them. The other files are read once at the start; after
+  that one is read again only when its character says it has finished writing it (init.lua
+  passes that on), never on a timer, so a file is never read while it is half written.
 
   Data:  cmds[word]          = {n = uses, t = last use, w = word as typed}
          args[context][word] = same; context = "<command>|<argument number>|<previous word>"
@@ -23,7 +25,7 @@ local MAX_PER_CONTEXT = 60
 
 local function empty() return { version = 1, cmds = {}, args = {}, lines = {} } end
 
----@param opts {dir:string, me:string, now?:(fun():number), clock?:(fun():number), write?:(fun(path:string, data:table))}
+---@param opts {dir:string, me:string, now?:(fun():number), clock?:(fun():number), write?:(fun(path:string, data:table)), saved?:(fun(name:string))}
 function M.new(opts)
     local self = setmetatable({}, M)
     self.dir = opts.dir
@@ -32,8 +34,10 @@ function M.new(opts)
     -- seconds for the save-when-idle timer
     self.clock = opts.clock or (okMq and function() return mq.gettime() / 1000 end) or nil
     self.write = opts.write or (okMq and mq.pickle) or nil
+    self.saved = opts.saved  -- called with the file's name after each successful save
     self.own = empty()
-    self.others = empty()
+    self.files = {}          -- other characters' files as last read: name -> data
+    self.others = empty()    -- the sum of self.files
     self.dirty = false
     self.changedAt = 0
     return self
@@ -57,8 +61,18 @@ local function sane(d)
     return d
 end
 
+function M:ownName()
+    return 'learned_' .. self.me .. '.lua'
+end
+
 function M:ownPath()
-    return self.dir .. '/learned_' .. self.me .. '.lua'
+    return self.dir .. '/' .. self:ownName()
+end
+
+---Is `name` another character's learned file (a bare file name, nothing else)?
+function M:isOther(name)
+    return type(name) == 'string' and name:match('^learned_[%w_]+%.lua$') ~= nil
+        and name:lower() ~= self:ownName():lower()
 end
 
 ---Loads this character's file. listFiles(dir) -> names in the folder, used to read the others.
@@ -67,25 +81,51 @@ function M:load(listFiles)
     self:loadOthers(listFiles)
 end
 
----Re-reads the other characters' files (sums them into self.others).
-function M:loadOthers(listFiles)
+-- sums the other characters' files into self.others
+local function merge(self)
     local others = empty()
-    if listFiles then
-        local mine = 'learned_' .. self.me .. '.lua'
-        for _, name in ipairs(listFiles(self.dir) or {}) do
-            if name:match('^learned_.+%.lua$') and name:lower() ~= mine:lower() then
-                local d = sane(M.readFile(self.dir .. '/' .. name))
-                for k, e in pairs(d.cmds) do M.add(others.cmds, k, e) end
-                for ctx, words in pairs(d.args) do
-                    if type(words) == 'table' then
-                        others.args[ctx] = others.args[ctx] or {}
-                        for k, e in pairs(words) do M.add(others.args[ctx], k, e) end
-                    end
-                end
+    for _, d in pairs(self.files) do
+        for k, e in pairs(d.cmds) do M.add(others.cmds, k, e) end
+        for ctx, words in pairs(d.args) do
+            if type(words) == 'table' then
+                others.args[ctx] = others.args[ctx] or {}
+                for k, e in pairs(words) do M.add(others.args[ctx], k, e) end
             end
         end
     end
     self.others = others
+end
+
+---Reads all the other characters' files.
+function M:loadOthers(listFiles)
+    self.files = {}
+    for _, name in ipairs(listFiles and listFiles(self.dir) or {}) do
+        if self:isOther(name) then
+            local d = M.readFile(self.dir .. '/' .. name)
+            if d then self.files[name:lower()] = sane(d) end
+        end
+    end
+    merge(self)
+end
+
+---Reads one other character's file again, after that character said it saved it. If it can't
+---be read, what was read from it before is kept.
+function M:reloadOther(name)
+    if not self:isOther(name) then return false end
+    local d = M.readFile(self.dir .. '/' .. name)
+    if not d then return false end
+    self.files[name:lower()] = sane(d)
+    merge(self)
+    return true
+end
+
+---Another character is now playing in this game window: saves what the last one learned, then
+---reads the new one's file and the others again.
+function M:switchTo(me, listFiles)
+    self:save()
+    self.me = me
+    self.dirty = false
+    self:load(listFiles)
 end
 
 -- adds entry e ({n, t, w}) into map[k]
@@ -103,7 +143,10 @@ end
 function M:save()
     if not self.dirty or not self.write then return true end
     local ok = pcall(self.write, self:ownPath(), self.own)
-    if ok then self.dirty = false end
+    if ok then
+        self.dirty = false
+        if self.saved then self.saved(self:ownName()) end
+    end
     return ok
 end
 

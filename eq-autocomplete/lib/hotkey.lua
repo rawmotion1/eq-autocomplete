@@ -12,9 +12,16 @@
   The binds are saved in MacroQuest.ini and MQ2CustomBinds.txt (all characters), but a game
   window reads them only when it starts, so init.lua has every running copy apply the shared
   setting to its own window.
+
+  MQ2CustomBinds ships with MacroQuest and is loaded by default, but it can be unloaded. Before
+  any of this it is checked, and if it isn't loaded it is loaded with "noauto": for this session
+  only, so the plugins MacroQuest.ini loads at start are left as the user set them.
 ]]
+local mq = require('mq')
+
 local M = {}
 
+M.PLUGIN = "MQ2CustomBinds"
 M.BIND = "eqac"
 M.COMMAND = "/docommand ${If[${Lua.Script[eq-autocomplete].Status.Equal[RUNNING]},/eqac show,"
     .. "/lua run eq-autocomplete show]}"
@@ -35,6 +42,22 @@ function M.steps(key)
         { cmd = "/bind " .. M.BIND .. " clear" },
         { cmd = "/custombind delete " .. M.BIND },
     }
+end
+
+local function pluginLoaded()
+    local ok, loaded = pcall(function() return mq.TLO.Plugin(M.PLUGIN).IsLoaded() end)
+    return ok and loaded == true
+end
+
+---Makes sure MQ2CustomBinds is loaded, loading it "noauto" if it isn't. Waits for it, so call it
+---from the main loop only. Returns ok, and whether it was loaded just now.
+---@return boolean ok, boolean loadedNow
+function M.ensurePlugin()
+    if pluginLoaded() then return true, false end
+    mq.cmd("/squelch /plugin " .. M.PLUGIN .. " load noauto")
+    mq.delay(2000, pluginLoaded)
+    local ok = pluginLoaded()
+    return ok, ok
 end
 
 ---`cmd` with MacroQuest's replies squelched (/noparse stays first so the ${...} is kept as text).

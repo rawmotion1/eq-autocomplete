@@ -52,6 +52,15 @@ function M.new()
     return self
 end
 
+---Forgets every list and the class: another character is now playing in this game window.
+function M:reset()
+    self.cache = {}
+    self.wanted = {}
+    self.pluginCache = {}
+    self.class = nil
+    self.version = self.version + 1
+end
+
 -- -----------------------------------------------------------------------------------------
 -- engine interface
 
@@ -74,7 +83,7 @@ function M:pluginLoaded(name)
     return loaded
 end
 
----This character's class short name ("SHD"), read once.
+---This character's class short name ("SHD"), read once (again after reset()).
 function M:classShort()
     if self.class == nil then
         self.class = str(tlo(function() return mq.TLO.Me.Class.ShortName() end)) or false
