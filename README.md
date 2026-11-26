@@ -22,12 +22,16 @@ list), MQ2CustomBinds (ships with MacroQuest; used for the hotkey, see below).
 
 - **Every publicly listed EverQuest and MacroQuest command**, from the RedGuides command docs,
   including the plugins documented there (MQ2Nav, MQ2DanNet, MQ2MoveUtils...), with their
-  documented abbreviations (`/nav`, `/dex`, `/dgge`...). Plugin commands only show up while the
-  plugin is loaded.
-- **Common commands for popular plugins.** I'm adding these over time. Already in: the CWTN class
-  plugins (`/shd`, `/shm`, `/brd`...), with the commands listed on each plugin's RedGuides page.
-  Your own class's command comes first.
-- **Your aliases** from MacroQuest.ini. An alias that wraps another command, like
+  documented abbreviations (`/nav`, `/dex`, `/dgge`...). A plugin's commands show up if the
+  plugin is loaded when the script starts (KissAssist's and RGMercs' always do). A plugin loaded later shows
+  up after the script is restarted.
+- **Common commands for popular plugins and scripts.** I'm adding these over time. Already in:
+  - the CWTN class plugins (`/shd`, `/shm`, `/brd`...), with the commands listed on each plugin's
+    RedGuides page. Your own class's command comes first.
+  - RGMercs (`/rgl`), with the commands it lists when you type `/rgl` in game (pull modes,
+    assist and heal lists, chase and camp, pause...). Its settings (`/rgl set <setting>`) aren't
+    listed.
+- **Your aliases** from MacroQuest.ini, read when the script starts. An alias that wraps another command, like
   `/cwtn = /dgge /docommand /$\{Me.Class.ShortName}`, completes like the command it runs.
 - **What comes next:** after `/nav` it offers `spawn`, `target`, `loc`...; after `/hidecorpse`
   its options. The command's syntax is shown under the list.

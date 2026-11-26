@@ -6,7 +6,6 @@
   sources (see lib/sources.lua for the real one):
     sources:get(kind)          -> {{w = value, d = description?, b = bonus?}, ...}  live values
     sources:pluginLoaded(name) -> bool          is a command's plugin there
-    sources:macroRunning(pat)  -> bool          (KissAssist commands)
     sources:aliases()          -> {['/t'] = '/tell', ...}   MacroQuest.ini [Aliases]
     sources:classShort()       -> 'SHD'          (optional) this character's class
   A live value may carry m = another name to match on (a zone's long name).
@@ -91,8 +90,9 @@ end
 ---Is a command usable right now (its plugin loaded)?
 function M:available(c)
     local p = c.p
-    if p == 'EverQuest' or p == 'MacroQuest' then return true end
-    if p == 'KissAssist' then return self.sources:macroRunning('kiss') end
+    -- KissAssist's and RGMercs' commands are always offered: without the script running they
+    -- just do nothing
+    if p == 'EverQuest' or p == 'MacroQuest' or p == 'KissAssist' or p == 'RGMercs' then return true end
     return self.sources:pluginLoaded(p)
 end
 

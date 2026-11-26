@@ -47,16 +47,17 @@ function M.new()
     self.cache = {}
     self.wanted = {}
     self.version = 0
-    self.pluginCache = {}
-    self.aliasMap, self.aliasAt = nil, -1000
+    self.plugins = nil   -- loaded plugins (lower-case names), from scanPlugins(); nil until then
+    self.aliasMap = nil  -- from loadAliases(), once at startup
     return self
 end
 
----Forgets every list and the class: another character is now playing in this game window.
+---Forgets every list, the class and the loaded plugins: another character is now playing in
+---this game window (init.lua scans its plugins again shortly).
 function M:reset()
     self.cache = {}
     self.wanted = {}
-    self.pluginCache = {}
+    self.plugins = nil
     self.class = nil
     self.version = self.version + 1
 end
@@ -70,17 +71,27 @@ function M:get(kind)
     return c and c.list or {}
 end
 
-function M:pluginLoaded(name)
-    local c = self.pluginCache[name]
-    if c and now() - c.t < 10 then return c.loaded end
-    local loaded = false
-    local tries = { name, 'MQ2' .. name, 'MQ' .. name }
-    if name:sub(1, 3):upper() == 'MQ2' then tries[#tries + 1] = 'MQ' .. name:sub(4) end
-    for _, n in ipairs(tries) do
-        if tlo(function() return mq.TLO.Plugin(n).IsLoaded() end) then loaded = true; break end
+---Reads MacroQuest's list of loaded plugins, once (init.lua calls it a few seconds after the
+---start, when a character's own plugins have had time to load).
+function M:scanPlugins()
+    local set = {}
+    for i = 1, 500 do  -- Plugin(i) counts from 1 and has no name past the last one
+        local name = str(tlo(function() return mq.TLO.Plugin(i).Name() end))
+        if not name then break end
+        set[name:lower()] = true
     end
-    self.pluginCache[name] = { t = now(), loaded = loaded }
-    return loaded
+    self.plugins = set
+    self.version = self.version + 1
+end
+
+---Is a plugin loaded? The docs name some without their prefix (ChatWnd for MQ2ChatWnd). Before
+---the scan every plugin counts as loaded, so no command is missing in the first seconds.
+function M:pluginLoaded(name)
+    local set = self.plugins
+    if not set then return true end
+    local n = name:lower()
+    if set[n] or set['mq2' .. n] or set['mq' .. n] then return true end
+    return n:sub(1, 3) == 'mq2' and set['mq' .. n:sub(4)] == true
 end
 
 ---This character's class short name ("SHD"), read once (again after reset()).
@@ -91,12 +102,7 @@ function M:classShort()
     return self.class or nil
 end
 
-function M:macroRunning(pattern)
-    local name = str(tlo(function() return mq.TLO.Macro.Name() end))
-    return name ~= nil and name:lower():find(pattern, 1, true) ~= nil
-end
-
----MacroQuest.ini [Aliases]: {['/t'] = '/tell', ...}. Re-read by refresh() (main loop) every 30 s.
+---MacroQuest.ini [Aliases]: {['/t'] = '/tell', ...}, read once at startup (loadAliases()).
 function M:aliases()
     return self.aliasMap or self:loadAliases()
 end
@@ -112,7 +118,7 @@ function M:loadAliases()
             if k and v and k:sub(1, 1) == '/' then map[k:lower()] = v end
         end
     end
-    self.aliasMap, self.aliasAt = map, now()
+    self.aliasMap = map
     return map
 end
 
@@ -356,7 +362,6 @@ end
 function M:refresh()
     local t = now()
     local changed = false
-    if t - self.aliasAt >= 30 then self:loadAliases() end
     for kind, at in pairs(self.wanted) do
         local c = self.cache[kind]
         if t - at < WANTED_FOR and (not c or t - c.t >= (TTL[kind] or 10)) and collect[kind] then

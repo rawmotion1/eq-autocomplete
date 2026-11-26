@@ -117,8 +117,16 @@ end
 for name, entry in pairs(Cwtn.commands()) do
     if not commands.commands[name] then commands.commands[name] = entry end
 end
+-- RGMercs (/rgl), as its in-game command list shows it
+for name, entry in pairs(require('eq-autocomplete.lib.rgmercs')) do
+    if not commands.commands[name] then commands.commands[name] = entry end
+end
 
 local sources = Sources.new()
+sources:loadAliases()  -- once: aliases are read at startup only
+-- the loaded plugins are read once, a few seconds after the start (or after switching
+-- characters), so plugins a character's own setup loads on entering the world are counted
+local pluginScanAt = mq.gettime() + 5000 ---@type number|nil
 local engine = Engine.new({ commands = commands, extras = extras, learn = learn, sources = sources })
 
 -- this character's own class command ranks first among the CWTN ones (others stay offered for /dex Name /shm...)
@@ -193,10 +201,15 @@ while true do
             learn:switchTo(me)
             loadSettings()
             sources:reset()
+            pluginScanAt = mq.gettime() + 5000
             rankClassCommand()
             ui:reset()
         end
     else
+        if pluginScanAt and mq.gettime() >= pluginScanAt then
+            pluginScanAt = nil
+            sources:scanPlugins()
+        end
         sources:refresh()
         while #queue > 0 do
             mq.cmd(table.remove(queue, 1))
