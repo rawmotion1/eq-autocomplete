@@ -189,19 +189,20 @@ function collect.spawns(self)
     end
     for _, n in ipairs(names.list) do add(n.w, n.d, 8 + (n.b or 0)) end
     local myId = tonumber(tlo(function() return mq.TLO.Me.ID() end)) or 0
+    -- spawns within 100 units only, so suggestions stay what a player could see and reach (your
+    -- own characters, above, are offered wherever they are). One pass over the spawn list.
+    local ok, spawns = pcall(mq.getFilteredSpawns, function(s)
+        local dist = s.Distance()
+        if not dist or dist > 100 or s.ID() == myId then return false end
+        local typ = s.Type()
+        return typ == 'NPC' or typ == 'PC' or typ == 'Mercenary'
+    end)
     local near = {}
-    -- spawns within 100 units only, so suggestions stay what a player could see and reach
-    -- (your own characters, above, are offered wherever they are)
-    for _, t in ipairs({ { 'npc', 'NPC' }, { 'pc', 'PC' }, { 'mercenary', 'Mercenary' } }) do
-        local search = t[1] .. ' radius 100'
-        local count = tonumber(tlo(function() return mq.TLO.SpawnCount(search)() end)) or 0
-        for i = 1, math.min(count, 40) do
-            local s = tlo(function() return mq.TLO.NearestSpawn(i, search) end)
-            local id = s and tonumber(tlo(function() return s.ID() end)) or 0
-            local name = s and str(tlo(function() return s.CleanName() end))
-            local dist = s and tonumber(tlo(function() return s.Distance() end))
-            if id ~= myId and name and dist then near[#near + 1] = { name = name, dist = dist, typ = t[2] } end
-        end
+    for _, s in ipairs(ok and spawns or {}) do
+        local name = str(tlo(function() return s.CleanName() end))
+        local dist = tonumber(tlo(function() return s.Distance() end))
+        local typ = str(tlo(function() return s.Type() end))
+        if name and dist and typ then near[#near + 1] = { name = name, dist = dist, typ = typ } end
     end
     table.sort(near, function(a, b) return a.dist < b.dist end)
     for i, s in ipairs(near) do

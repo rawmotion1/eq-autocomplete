@@ -5,7 +5,8 @@
     Tab, or Right arrow at the end of the line   complete the word with the highlighted suggestion
     Up / Down                                    move through the suggestions; with none showing,
                                                  step through the lines you sent before
-    Enter                                        send the line to MacroQuest
+    Enter                                        send the line to MacroQuest (after Up/Down picked a
+                                                 suggestion, that suggestion is taken first)
     Escape                                       clear the line (again: leave the box)
   The grip on the left moves the box; right-click it for options.
 ]]
@@ -30,6 +31,7 @@ function M.new(opts)
     self.result = { items = {}, token = { s = 1, e = 0 } }
     self.resultText, self.resultCursor, self.resultVersion = nil, nil, -1
     self.sel = 1
+    self.picked = false  -- the highlight was moved with Up/Down: Enter takes that suggestion
     self.top = 1
     self.hist, self.histText = nil, nil
     self.focusNext = false
@@ -62,11 +64,13 @@ function M:refresh(force)
     self.result = self.engine:suggest(self.text, self.cursor)
     self.resultText, self.resultCursor, self.resultVersion = self.text, self.cursor, self.sources.version
     self.sel = 1
+    local kept = false
     if keep then
         for i, it in ipairs(self.result.items) do
-            if it.w == keep.w then self.sel = i; break end
+            if it.w == keep.w then self.sel, kept = i, true; break end
         end
     end
+    if not kept then self.picked = false end  -- a new list: nothing picked in it yet
     self:keepVisible()
 end
 
@@ -82,6 +86,7 @@ function M:moveSel(delta)
     local n = #self:items()
     if n == 0 then return end
     self.sel = ((self.sel - 1 + delta) % n) + 1
+    self.picked = true  -- Enter now takes this suggestion
     self:keepVisible()
 end
 
@@ -382,6 +387,10 @@ function M:drawBox()
         end
         if entered then
             local line = self.text
+            -- a suggestion picked with Up/Down is taken first; otherwise the line is sent as typed
+            local item = self.picked and self.resultText == line and self:selected()
+            if item then line = Engine.apply(line, self.result, item) end
+            self.picked = false
             self.text, self.cursor, self.prevCursor = '', 0, 0
             self.hist, self.histText = nil, nil
             self:submit(line)
@@ -398,6 +407,7 @@ function M:reset()
     self.text, self.cursor, self.prevCursor = '', 0, 0
     self.hist, self.histText = nil, nil
     self.pendingEdit = nil
+    self.picked = false
     self.resultText = nil  -- suggestions are worked out again
 end
 

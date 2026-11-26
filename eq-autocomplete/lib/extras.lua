@@ -42,8 +42,9 @@ M.commands = {
             { 'locxyz', { v = 'coordinates' } }, { 'locyx', { v = 'coordinates' } },
         },
     },
-    ['/target'] = {
-        g = { { 'clear' }, { 'id', { v = 'spawnid' } }, { 'myself' }, { 'mycorpse' }, { 'npc' }, { 'pc' }, { 'corpse' },
+    -- MacroQuest's own target command (EverQuest's /target takes only a name or "group <1-6>")
+    ['/mqtarget'] = {
+        g = { { 'clear' }, { 'myself' }, { 'mycorpse' }, { 'id', { v = 'spawnid' } }, { 'npc' }, { 'pc' }, { 'corpse' },
             { { v = 'spawn search' } } },
     },
     ['/stick'] = {

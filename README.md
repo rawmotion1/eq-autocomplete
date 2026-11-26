@@ -53,7 +53,7 @@ list), MQ2CustomBinds (ships with MacroQuest; used for the hotkey, see below).
 | Tab | Complete the word with the highlighted suggestion |
 | Right arrow | The same, when the cursor is at the end of the line |
 | Up / Down | Move through the suggestions. With none showing, step through lines you sent before |
-| Enter | Run the line (a missing leading `/` is added) |
+| Enter | Run the line (a missing leading `/` is added). If you moved to a suggestion with Up/Down, it is taken first |
 | Escape | Clear the line; press again to leave the box |
 
 The highlighted suggestion shows as grey text after the cursor, and clicking a suggestion also
