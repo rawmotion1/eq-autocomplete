@@ -116,7 +116,9 @@ end
 ---Walks a grammar over the words typed so far.
 ---@param alts table[] the command's grammar (list of alternative sequences)
 ---@param words string[] values of the finished words after the command word
----@return table result {expect = {node...}, nested = index into words+1 where a nested command starts, or nil}
+---@return table result {expect = {node...}, nested = index into words of a typed word that starts a
+---nested command (or nil), nestedNext = the word being typed (after them) would start one if it is a
+---command, complete = the words so far are a whole command}
 function M.walk(alts, words)
     local n = #words
     local ctx = { expect = {}, seen = {}, nested = nil }
@@ -144,7 +146,14 @@ function M.walk(alts, words)
         if node.v then
             local rest = M.restKind(node.v)
             if rest == 'command' then
-                if not ctx.nested or ti < ctx.nested then ctx.nested = ti end
+                -- a nested command starts here only if the word here is one ("/..."), as DanNet
+                -- reads it: "/dge /sit" sends /sit to all, "/dge healers /sit" to a group. The
+                -- word being typed is the caller's to decide (nestedNext).
+                if ti > n then
+                    ctx.nestedNext = true
+                elseif words[ti]:sub(1, 1) == '/' and (not ctx.nested or ti < ctx.nested) then
+                    ctx.nested = ti
+                end
                 return {}
             elseif rest == 'text' then
                 if ti > n then addExpect(node) end

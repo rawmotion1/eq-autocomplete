@@ -185,6 +185,16 @@ local function xy(a, b)
     return 0, 0
 end
 
+-- Is any keyboard key held (ImGuiKey.Tab .. KeypadEqual are the keyboard's keys)? Once the box has
+-- the cursor, MacroQuest stops passing keys to EverQuest, so a key still held then (the one that
+-- opened the box) is never seen released by EverQuest, which then ignores its next press.
+local function keysHeld()
+    for key = ImGuiKey.Tab, ImGuiKey.KeypadEqual do
+        if ImGui.IsKeyDown(key) then return true end
+    end
+    return false
+end
+
 local function grip(self)
     local h = ImGui.GetFrameHeight()
     ImGui.PushStyleColor(ImGuiCol.Button, 0, 0, 0, 0)
@@ -347,6 +357,9 @@ function M:draw()
     local flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrollbar,
         ImGuiWindowFlags.NoScrollWithMouse, ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoDocking)
     if self.settings.locked then flags = bit32.bor(flags, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize) end
+    -- ImGui puts the cursor in a text field only in the focused window: focus the window first,
+    -- or the first press of the key (EverQuest having focus) does nothing visible
+    if self.focusNext then ImGui.SetNextWindowFocus() end
     local _, show = ImGui.Begin(WINDOW, nil, flags)
     local ok, minX, minY, maxX, maxY = true, nil, nil, nil, nil
     if show then
@@ -369,14 +382,21 @@ function M:drawBox()
         ImGui.SameLine(0, ImGui.GetStyle().ItemInnerSpacing.x)
         ImGui.SetNextItemWidth(-1)
         if self.focusNext then
-            ImGui.SetKeyboardFocusHere()
-            self.focusNext = false
+            -- take the cursor once every key is let go (or after 1.5 s of a key held)
+            self.focusWaitSince = self.focusWaitSince or ImGui.GetTime()
+            if not keysHeld() or ImGui.GetTime() - self.focusWaitSince > 1.5 then
+                ImGui.SetKeyboardFocusHere()
+                self.focusNext, self.focusWaitSince = false, nil
+            end
         end
         local inputFlags = bit32.bor(ImGuiInputTextFlags.EnterReturnsTrue, ImGuiInputTextFlags.CallbackCompletion,
             ImGuiInputTextFlags.CallbackHistory, ImGuiInputTextFlags.CallbackAlways, ImGuiInputTextFlags.EscapeClearsAll)
         local text, entered = ImGui.InputTextWithHint('##eqac_input', '/command   (Tab completes)', self.text, inputFlags,
             self.callback)
         self.active = ImGui.IsItemActive()
+        -- left with Escape or Enter: the box's window would keep ImGui's focus, and the next press of
+        -- the key would do nothing; let go of it, as clicking in EverQuest does
+        local leftByKey = ImGui.IsItemDeactivated() and (entered or ImGui.IsKeyPressed(ImGuiKey.Escape))
         minX, minY = xy(ImGui.GetItemRectMin())
         maxX, maxY = xy(ImGui.GetItemRectMax())
 
@@ -396,6 +416,7 @@ function M:drawBox()
             self:submit(line)
             if self.settings.keepFocus then self.focusNext = true end
         end
+        if leftByKey and not self.focusNext then ImGui.SetWindowFocus(nil) end  -- nil: no window
         self:refresh()
         ghost(self, minX, minY, maxX)
     end

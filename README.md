@@ -44,8 +44,11 @@ list), MQ2CustomBinds (ships with MacroQuest; used for the hotkey, see below).
     buffs (`/removebuff`), abilities (`/doability`)
   - Lua scripts (`/lua run`), running scripts (`/lua stop`), macros (`/mac`), plugins (`/plugin`),
     DanNet groups (`/dgt`, `/dgae`)
-- **Nested commands:** after `/dex Name`, `/dgge`, `/timed 10`, `/squelch`, `/noparse` and the
-  like, the rest of the line completes as a command of its own: `/dex Bob /nav spawn Alice`.
+- **Commands sent to other characters, and other nested commands:** after a DanNet broadcast
+  (`/dex Name`, `/dge` and `/dgae` with or without a group, `/dgge`, `/dgza`...), EQBC's
+  (`/bca //`, `/bct Name //`...), MQRemote's (`/rc group`, `/rc +self zone`...), and `/timed 10`,
+  `/squelch`, `/noparse` and the like, the rest of the line completes exactly like the command on
+  its own: `/dgae /nav spawn Alice`, `/dex Bob /rgl pullmode camp`.
 - **What you type:** every argument is remembered in its place, so the names and commands you use
   most rise to the top, and commands it doesn't know yet get suggestions too. Messages (the text
   of a `/tell`) are not remembered word by word.
@@ -84,7 +87,8 @@ usage and settings when that one enters the world.
 
 `/eqac key shift+/` makes shift+/ open the box with `/` already typed. Any MacroQuest key
 combination works (`ctrl+/`, `shift+enter`...). If the script isn't running, the key starts it.
-Plain `/` can't be used: EverQuest opens its chat window on it anyway.
+Plain `/` can't be used: EverQuest itself opens its chat line on `/`, and that isn't one of its key
+settings.
 
 The key is a MacroQuest key bind, so MacroQuest saves it for all your characters. A game window
 that is already running gets it the next time the script starts there.

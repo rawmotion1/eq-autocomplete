@@ -165,7 +165,7 @@ mq.bind('/eqac', function(...)
         if want == '' then
             say("Key: %s. /eqac key <combo> sets one (e.g. shift+/), /eqac key off removes it.", Hotkey.saved() or 'none')
         elseif want == '/' then
-            say("Plain / can't be used: EverQuest's chat window opens on it anyway. Try a combination, e.g. /eqac key shift+/")
+            say("Plain / can't be used: EverQuest itself opens its chat line on / (built in, not a key setting). Try a combination, e.g. /eqac key ctrl+/")
         else
             keyRequest = { key = (want:lower() ~= 'off') and want or false }
         end

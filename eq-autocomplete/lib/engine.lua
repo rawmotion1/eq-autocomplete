@@ -267,10 +267,13 @@ function M:suggest(text, cursor, depth)
     local list, index = {}, {}
     if entry then
         local ctx = grammar.walk(entry.g, words)
-        if ctx.nested and depth < 4 then
-            -- the rest of the line is another command: complete it as one
-            local tokenNo = ctx.nested - #extra + 1   -- 2 = first word after the command
+        local nestedNo = ctx.nested
+        if not nestedNo and ctx.nestedNext and current.value:sub(1, 1) == '/' then nestedNo = #words + 1 end
+        if nestedNo and depth < 4 then
+            -- the rest of the line is another command (/dgae /nav spawn...): complete it as one
+            local tokenNo = nestedNo - #extra + 1   -- 2 = first word after the command
             local start = (tokenNo <= #tokens) and tokens[tokenNo].s or current.s
+            if text:sub(start, start + 1) == '//' then start = start + 1 end  -- EQBC writes //command
             if tokenNo >= 2 then
                 local sub = self:suggest(text:sub(start), cursor - start + 1, depth + 1)
                 sub.token.s = sub.token.s + start - 1
@@ -298,7 +301,7 @@ function M:suggest(text, cursor, depth)
                 end
             end
         end
-        if #ctx.expect == 0 and not ctx.nested and not ctx.complete then
+        if #ctx.expect == 0 and not nestedNo and not ctx.complete then
             -- what was typed doesn't fit the documented syntax: offer its keywords anyway, lower
             for _, kw in ipairs(grammar.keywords(entry.g)) do
                 if not typedSet[lower(kw)] then addCandidate(list, index, kw, 'keyword', nil, BASE.keyword - 12) end
@@ -376,9 +379,15 @@ function M:record(line, depth)
             local before = {}
             for j = 1, i - 1 do before[j] = words[j] end
             local ctx = grammar.walk(entry.g, before)
-            if ctx.nested and ctx.nested <= i and depth < 4 then
-                local tokenNo = ctx.nested - #extra + 1
-                if tokenNo >= 2 and tokens[tokenNo] then self:record(line:sub(tokens[tokenNo].s), depth + 1) end
+            local nestedNo = ctx.nested
+            if not nestedNo and ctx.nestedNext and words[i]:sub(1, 1) == '/' then nestedNo = i end
+            if nestedNo and depth < 4 then
+                local tokenNo = nestedNo - #extra + 1
+                if tokenNo >= 2 and tokens[tokenNo] then
+                    local s = tokens[tokenNo].s
+                    if line:sub(s, s + 1) == '//' then s = s + 1 end  -- EQBC writes //command
+                    self:record(line:sub(s), depth + 1)
+                end
                 return
             end
             local onlyText = #ctx.expect > 0

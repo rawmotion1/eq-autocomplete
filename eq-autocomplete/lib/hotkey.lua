@@ -7,7 +7,8 @@
   (stored with /noparse, so the ${...} is worked out on each key press: when the script isn't
   running the key starts it), and /bind eqac <key>.
 
-  Plain "/" can't be used: EverQuest's chat window opens on it anyway.
+  Plain "/" can't be used: EverQuest itself opens its chat line on "/", with a "/" typed. That is
+  built in, not one of its key settings (tried 2026-11-27: the box opened, and EQ's chat line too).
 
   MacroQuest saves the binds in MacroQuest.ini and MQ2CustomBinds.txt, for every character, and
   that is the only record of the key. A game window reads those files only when the game starts,

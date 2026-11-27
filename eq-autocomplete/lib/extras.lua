@@ -34,6 +34,19 @@ M.commands = {
             { 'conf', { v = 'setting' }, opt({ v = 'value' }) }, { 'reloadconf' }, { 'gui' },
         },
     },
+    -- DanNet: with no group, /dge and /dgae send to every peer ("/dgae /sit"): a word starting
+    -- with "/" is the command (MQ2DanNet's own parsing)
+    ['/dgexecute'] = { g = { { { v = 'command' } } } },
+    ['/dgaexecute'] = { g = { { { v = 'command' } } } },
+    -- MQRemote: the "message" its docs show is a command sent to the channel (its README)
+    ['/rc'] = {
+        g = {
+            { opt('+self'), { alt = { { 'global' }, { 'server' }, { 'zone' }, { 'group' }, { 'raid' }, { { v = 'channel' } } } },
+                { v = 'command' } },
+            { { alt = { { 'global' }, { 'server' }, { 'zone' }, { 'group' }, { 'raid' }, { { v = 'channel' } } } },
+                { v = 'name' }, { v = 'command' } },
+        },
+    },
     -- '/nav spawn <search>' and '/nav id <n>' are what people type; the docs show only <spawn search>
     ['/navigate'] = {
         g = {
